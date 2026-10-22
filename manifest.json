@@ -1,0 +1,17 @@
+{
+  "name": "WASM-OS Studio v4.0",
+  "short_name": "WASM-OS",
+  "description": "Limbo-Class Browser x86 Hypervisor",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#060911",
+  "theme_color": "#0f172a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzEwYjk4MSIgZD0iTTIyIDNIMnYxOGgyMFYzem0tMiAxNkg0VjVoMTZ2MTR6Ii8+PC9zdmc+",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ]
+}
