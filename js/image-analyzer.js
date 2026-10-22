@@ -44,7 +44,7 @@
     a.needs64 = a.elf64 || (a.efer && a.int13ext);
     const lower = (name || "").toLowerCase();
     if (a.iso || lower.endsWith(".iso")) a.drive = "cdrom";
-    else if (FLOPPY_SIZES.indexOf(u.length) >= 0 && a.parts.length === 0) a.drive = "fda";
+    else if (window.FLOPPY_SIZES.indexOf(u.length) >= 0 && a.parts.length === 0) a.drive = "fda";
     else a.drive = "hda";
     return a;
   }
@@ -99,7 +99,7 @@
   }
   function floppyBuffer(buf) {
     const len = buf.byteLength;
-    for (const s of FLOPPY_SIZES) if (len <= s) return len === s ? buf : padTo(buf, s);
+    for (const s of window.FLOPPY_SIZES) if (len <= s) return len === s ? buf : padTo(buf, s);
     return buf;
   }
   function startFromBuffer(buf, drive, name) {

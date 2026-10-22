@@ -24,7 +24,7 @@
     return new Promise((res, rej) => {
       const s = document.createElement("script");
       let done = false;
-      const t = setTimeout if (!done) { done = true; s.remove(); rej(new Error("Timeout")); } }, 25000);
+      const t = setTimeout(() => { if (!done) { done = true; s.remove(); rej(new Error("Timeout")); } }, 25000);
       s.src = url;
       s.async = true;
       s.onload = () => { if (!done) { done = true; clearTimeout(t); res(); } };
@@ -53,7 +53,7 @@
 
   async function fetchBuf(urls, label, onProg) {
     let last = null;
-    const rawFetch = origWindowFetch || window.fetch.bind(window);
+    const rawFetch = window.fetch || window.fetch.bind(window);
     for (const url of urls) {
       const ctl = new AbortController();
       const to = setTimeout(() => ctl.abort(), 90000);
@@ -155,7 +155,7 @@
   function scheduleRender() {
     if (S.rafPending) return;
     S.rafPending = true;
-    requestAnimationFrame
+    requestAnimationFrame(() => {
       S.rafPending = false;
       let last = "";
       const rows = [];

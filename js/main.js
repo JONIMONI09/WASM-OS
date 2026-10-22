@@ -152,7 +152,7 @@
       "https://api.codetabs.com/v1/proxy?quest=https://i.copy.sh/freedos722.img"
     ]
   };
-  const FLOPPY_SIZES = [163840, 184320, 327680, 368640, 737280, 1228800, 1474560, 2949120];
+  window.FLOPPY_SIZES = [163840, 184320, 327680, 368640, 737280, 1228800, 1474560, 2949120];
 
   // Tested Embedded x86 Bootable Images (Mode 13h GUI Desktop & 80x25 Real-Mode Shell)
 
@@ -618,3 +618,4 @@
   window.__studio = { analyzeImage, createBlankFat16Disk, S };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();
+})();
