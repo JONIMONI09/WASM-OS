@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>WASM OS Studio v3 – x86 Hypervisor (v86), Boot-Diagnose &amp; Android-Steuerung</title>
+<style>
+:root{--bg:#070b12;--panel:#0f172a;--line:#1e293b;--ac:#10b981;--cy:#06b6d4;--am:#f59e0b;--rd:#ef4444;--tx:#e2e8f0;--mut:#94a3b8;--tfs:9px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono","Courier New",monospace}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);min-height:100dvh}
+button,select,input{font:inherit;color:inherit}
+header{padding:10px 12px;border-bottom:1px solid var(--line);background:#0b1220}
+h1{margin:0;font-size:14px;letter-spacing:.04em;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tag{font-size:10px;padding:2px 7px;border-radius:5px;border:1px solid #065f46;background:#064e3b55;color:#6ee7b7}
+#status{color:var(--mut);font-size:11px;margin-top:3px;word-break:break-word}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:11px}
+.badge{background:#020617;border:1px solid var(--line);border-radius:6px;padding:3px 8px;color:var(--mut)}
+.badge b{color:var(--cy);font-weight:600}
+.grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:10px;max-width:1280px;margin:0 auto}
+@media(min-width:1000px){.grid{grid-template-columns:minmax(0,1fr) 430px;align-items:start}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+.card h2{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ac)}
+.btn{min-height:44px;padding:8px 12px;border-radius:8px;border:1px solid #334155;background:#1e293b;cursor:pointer;touch-action:manipulation;text-align:left}
+.btn:active{transform:scale(.98)}
+.btn.pri{background:#065f46;border-color:#10b981}
+.btn.warn{background:#78350f;border-color:#f59e0b}
+.btn.sm{min-height:40px;padding:6px 10px;text-align:center}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.sub{display:block;font-size:11px;color:var(--mut);margin-top:2px}
+.list{display:grid;gap:6px}
+#alert{margin:10px;padding:10px;border:1px solid #b91c1c;background:#450a0acc;border-radius:10px;display:none}
+#alert.show{display:block}
+#alert .t{font-weight:700;color:#fca5a5;margin-bottom:4px}
+#alert pre{margin:0 0 8px;white-space:pre-wrap;word-break:break-word;font:inherit;color:#fee2e2}
+#alert.info{border-color:#0e7490;background:#083344cc}
+#alert.info .t{color:#67e8f9}
+#screen-wrap{position:relative;background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+#screen_container{width:100%;min-height:220px;background:#000;overflow-x:auto;overflow-y:hidden;padding:4px}
+#screen_container>div{white-space:pre;font-family:"Courier New",Courier,monospace!important;font-size:var(--tfs)!important;line-height:1.2!important;color:#e2e8f0;width:max-content;min-width:100%}
+#screen_container>canvas{width:100%!important;height:auto!important;max-height:62dvh;object-fit:contain;image-rendering:pixelated;margin:0 auto;touch-action:none}
+#overlay{position:absolute;inset:0;background:#020617ee;z-index:5;display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;gap:8px}
+#overlay.show{display:flex}
+.bar{width:min(260px,80%);height:8px;background:#1e293b;border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--ac);transition:width .15s}
+#vga-mirror{margin-top:6px;background:#020617;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:11px;color:var(--mut);display:flex;justify-content:space-between;gap:8px}
+#vga-last{color:#e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pad{height:150px;border:1px dashed #0e7490;border-radius:10px;background:#083344aa;display:flex;align-items:center;justify-content:center;color:#67e8f9;touch-action:none;user-select:none;-webkit-user-select:none;text-align:center;padding:8px}
+.phases{display:grid;gap:3px;font-size:12px}
+.ph{color:var(--mut)}.ph.ok{color:#6ee7b7}.ph.err{color:#fca5a5}.ph.run{color:#fcd34d}
+select,input[type=text]{background:#020617;border:1px solid #334155;border-radius:8px;padding:8px;min-height:40px}
+input[type=text]{flex:1;min-width:120px}
+.log{height:170px;overflow:auto;background:#020617;border:1px solid var(--line);border-radius:8px;padding:6px;font-size:11px;white-space:pre-wrap;word-break:break-word}
+.l-ok{color:#6ee7b7}.l-warn{color:#fcd34d}.l-err{color:#fca5a5;font-weight:600}.l-ser{color:#6ee7b7}
+.tabs{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.tab{min-height:36px;padding:4px 10px;border-radius:7px;border:1px solid #334155;background:#0f172a;cursor:pointer}
+.tab.on{background:#064e3b;border-color:#10b981}
+#analysis{display:none;margin-top:8px;font-size:11px;background:#020617;border:1px solid var(--line);border-radius:8px;padding:8px}
+#analysis.show{display:block}
+#analysis div{margin:1px 0}.a-ok{color:#6ee7b7}.a-bad{color:#fca5a5}.a-warn{color:#fcd34d}.a-inf{color:#cbd5e1}
+#hex{margin:0;height:150px;overflow:auto;background:#020617;border:1px solid var(--line);border-radius:8px;padding:6px;font-size:10px;line-height:1.3;color:#67e8f9}
+details summary{cursor:pointer;color:#67e8f9;min-height:36px;display:flex;align-items:center}
+details p,details li{color:#cbd5e1;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1><span id="dot" style="width:10px;height:10px;border-radius:50%;background:#10b981;display:inline-block"></span>
+    WASM-OS STUDIO v3 <span class="tag">x86 · v86 · ehrliche Boot-Diagnose</span></h1>
+  <div id="status">Initialisiere …</div>
+  <div class="badges">
+    <span class="badge">ENGINE <b id="b-engine">bereit</b></span>
+    <span class="badge">VIDEO <b id="b-video">–</b></span>
+    <span class="badge">RAM <b id="b-ram">–</b></span>
+    <span class="badge">CPU <b id="b-cpu">–</b></span>
+    <span class="badge">COM1 <b id="b-ser">0 B</b></span>
+    <button class="btn sm" id="btn-report" style="min-height:30px">📋 Diagnose-Report kopieren</button>
+  </div>
+</header>
+
+<section id="alert" role="alert">
+  <div class="t" id="alert-title">Hinweis</div>
+  <pre id="alert-msg"></pre>
+  <div class="row">
+    <button class="btn sm warn" id="btn-force" style="display:none">▶ Trotzdem starten (Test)</button>
+    <button class="btn sm pri" id="btn-alt-desktop" style="display:none">🖥️ VibeOS-Desktop starten</button>
+    <button class="btn sm" id="btn-copy-err">📋 Kopieren</button>
+    <button class="btn sm" id="btn-dismiss">Schließen</button>
+  </div>
+</section>
+
+<main class="grid">
+  <!-- ============ Bildschirm + Steuerung ============ -->
+  <section style="display:grid;gap:10px;min-width:0">
+    <div class="card">
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn sm" id="btn-reboot">🔄 Neustart</button>
+        <button class="btn sm" id="btn-cad">⚡ Strg+Alt+Entf</button>
+        <button class="btn sm" id="btn-full">⛶ Vollbild</button>
+        <button class="btn sm" id="btn-tminus" title="Textmodus kleiner">A−</button>
+        <button class="btn sm" id="btn-tplus" title="Textmodus größer">A+</button>
+        <button class="btn sm" id="btn-pause">⏸ Pause</button>
+      </div>
+      <div id="screen-wrap">
+        <div id="overlay"><div style="font-weight:700" id="ov-title">Lade …</div><div id="ov-sub" style="color:var(--mut);font-size:12px"></div><div class="bar"><i id="ov-bar"></i></div></div>
+        <div id="screen_container"><div></div><canvas></canvas></div>
+      </div>
+      <div id="vga-mirror"><span id="vga-last">Warte auf BIOS-Ausgabe …</span><span id="vga-n">0 Zeichen</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Android-Steuerung</h2>
+      <div id="pad">👆 Touchpad: Finger ziehen = Maus bewegen<br>kurz tippen = Linksklick</div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn sm" id="m-left">🖱️ Links</button>
+        <button class="btn sm" id="m-right">🖱️ Rechts</button>
+        <button class="btn sm" id="m-drag">✋ Ziehen: aus</button>
+        <select id="m-sens" aria-label="Maus-Empfindlichkeit"><option value="0.8">Maus langsam</option><option value="1.4" selected>Maus normal</option><option value="2.4">Maus schnell</option></select>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn sm" data-key="Esc">Esc</button><button class="btn sm" data-key="Tab">Tab</button>
+        <button class="btn sm" data-key="Up">↑</button><button class="btn sm" data-key="Down">↓</button>
+        <button class="btn sm" data-key="Left">←</button><button class="btn sm" data-key="Right">→</button>
+        <button class="btn sm" data-key="Space">Space</button><button class="btn sm" data-key="Backspace">⌫</button>
+        <button class="btn sm pri" data-key="Enter">Enter ↵</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <input type="text" id="kbd" placeholder="Befehl oder Text (z. B. HELP) …" autocomplete="off" autocapitalize="off" spellcheck="false" />
+        <button class="btn sm pri" id="kbd-send">Senden ↵</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn sm" data-cmd="HELP">HELP</button><button class="btn sm" data-cmd="INFO">INFO</button>
+        <button class="btn sm" data-cmd="COLOR">COLOR</button><button class="btn sm" data-cmd="CLS">CLS</button>
+        <button class="btn sm" data-cmd="REBOOT">REBOOT</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <button class="tab on" id="tab-sys">📋 Hypervisor-Log</button>
+        <button class="tab" id="tab-ser">🔌 COM1 (QEMU-Style)</button>
+        <button class="tab" id="tab-txt">🖥️ VGA-Text</button>
+        <button class="tab" id="btn-clear">Leeren</button>
+      </div>
+      <div class="log" id="log-sys"></div>
+      <div class="log l-ser" id="log-ser" style="display:none"></div>
+      <div class="log" id="log-txt" style="display:none"></div>
+    </div>
+  </section>
+
+  <!-- ============ Boot-Optionen ============ -->
+  <section style="display:grid;gap:10px;min-width:0">
+    <div class="card">
+      <h2>1 · Betriebssystem starten</h2>
+      <div class="list">
+        <button class="btn pri" id="b-desktop">🖥️ VibeOS Desktop (Mode 13h, Maus, COM1)<span class="sub">Eigener x86-Code · in v86 getestet · funktioniert offline</span></button>
+        <button class="btn" id="b-shell">⚡ VibeOS Text-Shell (80×25)<span class="sub">HELP · INFO · COLOR · CLS · REBOOT · COM1</span></button>
+        <button class="btn" id="b-kolibri">🖼️ KolibriOS (Floppy, 32-Bit-GUI)<span class="sub">lädt von i.copy.sh (braucht Internet)</span></button>
+        <button class="btn" id="b-linux">🐧 Buildroot-Linux 4 (CD, 32-Bit)<span class="sub">lädt von i.copy.sh · ca. 7 MB</span></button>
+        <button class="btn" id="b-dos">💾 FreeDOS 722K<span class="sub">lädt von i.copy.sh</span></button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2 · Eigenes Image (.img / .iso)</h2>
+      <div class="row">
+        <select id="drive-type"><option value="auto" selected>Auto-Erkennung</option><option value="hda">Festplatte (hda)</option><option value="fda">Diskette (fda)</option><option value="cdrom">CD-ROM (cdrom)</option></select>
+        <select id="ram"><option value="32">32 MB</option><option value="64">64 MB</option><option value="128" selected>128 MB</option><option value="256">256 MB</option></select>
+      </div>
+      <label class="btn" style="display:block;margin-top:8px;border-style:dashed;border-color:#0e7490;text-align:center">
+        📂 Image wählen und analysieren
+        <input id="file" type="file" accept=".img,.iso,.bin,.flp,.raw,.vfd,.dsk" style="display:none" />
+      </label>
+      <div id="analysis"></div>
+    </div>
+
+    <div class="card">
+      <h2>Boot-Phasen (live)</h2>
+      <div class="phases" id="phases">
+        <div class="ph" id="ph-assets">○ Hypervisor &amp; BIOS geladen</div>
+        <div class="ph" id="ph-ready">○ Emulator gestartet</div>
+        <div class="ph" id="ph-bios">○ SeaBIOS-Banner sichtbar</div>
+        <div class="ph" id="ph-dev">○ Boot-Gerät gefunden („Booting from …“)</div>
+        <div class="ph" id="ph-guest">○ Lebenszeichen vom Gast-OS (Text/Grafik/COM1/Maus)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Bootsektor / Binär-Inspektor</h2>
+      <div class="row" style="margin-bottom:6px"><span class="badge" id="hex-badge">–</span></div>
+      <pre id="hex">Noch kein Image geladen.</pre>
+    </div>
+
+    <div class="card">
+      <h2>Export &amp; Werkzeuge</h2>
+      <div class="row">
+        <button class="btn sm" id="x-desktop">💾 vibeos_desktop.img</button>
+        <button class="btn sm" id="x-shell">💾 vibeos_shell.img</button>
+        <button class="btn sm" id="x-wasm">⚙️ Native .wasm testen</button>
+      </div>
+      <pre id="wasm-out" style="margin:8px 0 0;white-space:pre-wrap;font-size:11px;color:#6ee7b7"></pre>
+    </div>
+
+    <div class="card">
+      <details>
+        <summary>Warum läuft mein x86_64-Rust-OS nicht? (Anleitung)</summary>
+        <p>v86 emuliert einen 32-Bit-x86-PC. Der Rust-<code>bootloader</code> schaltet in Stage 3 in den 64-Bit-Long-Mode und lädt einen x86_64-ELF-Kernel. v86 unterstützt keine 64-Bit-Kernel – der Gast bleibt dann stumm (schwarzer Bildschirm) oder startet in einer Schleife neu.</p>
+        <ul>
+          <li><b>Weg A (v86):</b> Kernel als 32-Bit (i686) bauen und als bootfähiges Image (eigener Bootsektor oder GRUB-ISO) laden.</li>
+          <li><b>Weg B (64-Bit):</b> Emulator mit x86_64-Unterstützung nutzen (z. B. QEMU-Wasm oder Bochs-Wasm). Das ist groß und braucht normalerweise einen kleinen Webserver statt einer einzelnen Datei.</li>
+          <li><b>Weg C (Test):</b> Die eingebauten VibeOS-Images zeigen, dass Anzeige, Maus, Tastatur und COM1 in dieser Seite funktionieren.</li>
+        </ul>
+      </details>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+(() => {
+  // ====================================================================
+  // Konstanten
+  // ====================================================================
+  const V86_BASES = ["https://cdn.jsdelivr.net/npm/v86@0.5.472/build/", "https://unpkg.com/v86@0.5.472/build/"];
+  const BIOS_BASES = ["https://cdn.jsdelivr.net/gh/copy/v86@master/bios/", "https://raw.githubusercontent.com/copy/v86/master/bios/"];
+  const IMG_BASES = ["https://i.copy.sh/"];
+  const FLOPPY_SIZES = [163840, 184320, 327680, 368640, 737280, 1228800, 1474560, 2949120];
+  const B64_DESKTOP = "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VGhlbWUAAAAAAACgAGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  const B64_SHELL = "+jHAjtiOwI7QvAB8+4gWLny0ArAEMO2xAjD2ihYufLsAfs0TcgXqL3wAAPTr/QD6McCO2I7AjtC8AHz7uAMAzRC+hn3oFQG+Yn7oKQG+Vn7oCQG/K38xyTDkzRY8DXQ1PAh0GjwgcvCD+R5z6zxhcgY8encCLCCqQejrAOvahcl01k9JsAjo3gCwIOjZALAI6NQA68PGBQC+X37ovgCFyXSrvit/vw9/6J4AdDW+K3+/FH/okwB0Ob4rf78Zf+iIAHQ3vit/vx1/6H0AdDS+K3+/I3/ocgB0YL7Sfuh9AOlr/756fuh0AL56fuiIAOlc/76gfuhlAOlT/7gDAM0Q6Uv//gYqf4AmKn8PdQXGBip/AbQJsCCKHip/twC5AQC0BrAAij4qfzHJuk8YzRC0AjD/MdLNEOkU/74Bf+gdAL4Bf+gxAM0Z6/6KBIodONh1CITAdAZGR+vwDAHDrITAdAXoAwDr9sNQU7QOMP+KHip/zRBbWMOshMB0ClBSuvgD7lpY6/HDPT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT0NCiBWaWJlT1MgeDg2IFRleHQgU2hlbGwgKDE2LUJpdCBSZWFsIE1vZGUpDQogQm9vdCB2aWEgU2VhQklPUywgU2lnbmF0dXIgMHg1NUFBLCBDT00xIGFrdGl2DQo9PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PQ0KVGlwcGUgSEVMUA0KAA0KdmliZT4gAA0KAFtWSUJFU0hFTExdIGdlc3RhcnRldA0KAEJlZmVobGU6IEhFTFAgSU5GTyBDT0xPUiBDTFMgUkVCT09UDQoAQ1BVOiB4ODYgcmVhbCBtb2RlIHwgQm9vdCAweDdDMDAgfCB2ODYgV2FzbSBKSVQNCgBVbmJla2FubnRlciBCZWZlaGwuIEhFTFAgemVpZ3QgYWxsZSBCZWZlaGxlLg0KAE5ldXN0YXJ0Li4uDQoASEVMUABJTkZPAENMUwBDT0xPUgBSRUJPT1QABwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+
+  const $ = (id) => document.getElementById(id);
+  const S = {
+    emu: null, label: "", assets: null, base: null, t0: 0, paused: false,
+    g: null, history: [], serial: "", analysis: null, pending: null, tz: 1, sens: 1.4, drag: false,
+    lastIns: 0, timer: null, roll: "", grid: [], rafPending: false
+  };
+  function resetGuest() {
+    S.g = { chars: 0, charsAfterBoot: 0, serial: 0, gfx: 0, mouse: false, ide: 0, banners: 0, bootFound: false, bootAt: 0, warnedSilent: false, warnedLoop: false, warnedNoBoot: false, video: "–" };
+    S.serial = ""; S.roll = ""; S.grid = []; S.lastIns = 0;
+  }
+  resetGuest();
+
+  // ====================================================================
+  // Log / Alert / Hilfen
+  // ====================================================================
+  function log(msg, level, cat) {
+    level = level || "info"; cat = cat || "HV";
+    const line = "[" + new Date().toISOString().slice(11, 19) + "] [" + cat + "] " + msg;
+    S.history.push(line);
+    if (S.history.length > 1500) S.history.splice(0, 300);
+    (level === "err" ? console.error : level === "warn" ? console.warn : console.info)(line);
+    const box = $("log-sys");
+    if (box) {
+      const d = document.createElement("div");
+      d.className = level === "ok" ? "l-ok" : level === "warn" ? "l-warn" : level === "err" ? "l-err" : "";
+      d.textContent = line; box.appendChild(d);
+      while (box.childNodes.length > 400) box.removeChild(box.firstChild);
+      box.scrollTop = box.scrollHeight;
+    }
+    const st = $("status"); if (st) st.textContent = "[" + cat + "] " + msg;
+  }
+  function showAlert(code, msg, opt) {
+    opt = opt || {};
+    $("alert-title").textContent = (opt.info ? "ℹ️ " : "⚠️ ") + code;
+    $("alert-msg").textContent = msg;
+    $("alert").className = "show" + (opt.info ? " info" : "");
+    $("btn-force").style.display = opt.force ? "" : "none";
+    $("btn-alt-desktop").style.display = opt.alt ? "" : "none";
+    log(code + ": " + msg.split("\n")[0], opt.info ? "warn" : "err", "DIAG");
+  }
+  function hideAlert() { $("alert").className = ""; }
+  function crash(ctx, err) {
+    const m = err && err.stack ? err.message + "\n" + err.stack : String(err);
+    showAlert("RUNTIME_ERROR", ctx + ":\n" + m);
+  }
+  window.addEventListener("error", (e) => crash("Fehler im Skript", e.error || e.message));
+  window.addEventListener("unhandledrejection", (e) => crash("Unbehandelte Promise-Ablehnung", e.reason));
+
+  async function copyText(text, label) {
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); log(label + " kopiert (" + text.length + " Zeichen).", "ok", "CLIP"); return; } } catch (e) { /* Fallback */ }
+    const ta = document.createElement("textarea"); ta.value = text; ta.style.cssText = "position:fixed;left:-9999px;top:0";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try { document.execCommand("copy"); log(label + " kopiert (Fallback).", "ok", "CLIP"); }
+    catch (e) { log("Kopieren fehlgeschlagen: " + e, "err", "CLIP"); }
+    ta.remove();
+  }
+  const hex = (n, w) => n.toString(16).toUpperCase().padStart(w || 2, "0");
+  const b64 = (s) => { const r = atob(s), o = new Uint8Array(r.length); for (let i = 0; i < r.length; i++) o[i] = r.charCodeAt(i); return o; };
+  function setBadge(id, v) { const e = $(id); if (e) e.textContent = v; }
+
+  // ====================================================================
+  // Boot-Phasen
+  // ====================================================================
+  const PH_TXT = { "ph-assets": "Hypervisor & BIOS geladen", "ph-ready": "Emulator gestartet", "ph-bios": "SeaBIOS-Banner sichtbar", "ph-dev": "Boot-Gerät gefunden („Booting from …“)", "ph-guest": "Lebenszeichen vom Gast-OS (Text/Grafik/COM1/Maus)" };
+  function phase(id, st, extra) {
+    const e = $(id); if (!e) return;
+    e.className = "ph " + (st === "ok" ? "ok" : st === "err" ? "err" : st === "run" ? "run" : "");
+    e.textContent = (st === "ok" ? "✔ " : st === "err" ? "✖ " : st === "run" ? "… " : "○ ") + PH_TXT[id] + (extra ? " – " + extra : "");
+  }
+  function resetPhases() { Object.keys(PH_TXT).forEach((k) => phase(k, "")); }
+  function guestAlive() { return S.g.charsAfterBoot + S.g.serial + S.g.gfx + (S.g.mouse ? 1 : 0); }
+
+  // ====================================================================
+  // Laden: Skripte, Binärdateien
+  // ====================================================================
+  function loadScript(url) {
+    return new Promise((res, rej) => {
+      const s = document.createElement("script"); let done = false;
+      const t = setTimeout(() => { if (!done) { done = true; s.remove(); rej(new Error("Timeout")); } }, 25000);
+      s.src = url; s.async = true;
+      s.onload = () => { if (!done) { done = true; clearTimeout(t); res(); } };
+      s.onerror = () => { if (!done) { done = true; clearTimeout(t); s.remove(); rej(new Error("Netzwerk/CSP-Fehler")); } };
+      document.head.appendChild(s);
+    });
+  }
+  async function ensureV86() {
+    if (window.V86 && S.base) return;
+    for (const base of V86_BASES) {
+      try {
+        log("Lade libv86.js von " + base, "info", "LOAD");
+        await loadScript(base + "libv86.js");
+        if (typeof window.V86 === "function") { S.base = base; log("v86 geladen.", "ok", "LOAD"); return; }
+      } catch (e) { log("✗ " + base + ": " + e.message, "warn", "LOAD"); }
+    }
+    throw new Error("libv86.js konnte von keiner Quelle geladen werden (offline oder blockiert).");
+  }
+  async function fetchBuf(urls, label, onProg) {
+    let last = null;
+    for (const url of urls) {
+      const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 120000);
+      try {
+        log("Lade " + label + " ← " + url, "info", "LOAD");
+        const r = await fetch(url, { signal: ctl.signal, mode: "cors" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const total = Number(r.headers.get("content-length")) || 0;
+        let out;
+        if (r.body && r.body.getReader) {
+          const rd = r.body.getReader(), parts = []; let got = 0;
+          for (;;) { const x = await rd.read(); if (x.done) break; parts.push(x.value); got += x.value.length; if (onProg) onProg(got, total); }
+          out = new Uint8Array(got); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
+        } else { out = new Uint8Array(await r.arrayBuffer()); }
+        if (!out.length) throw new Error("leere Antwort");
+        return out.buffer;
+      } catch (e) { last = e; log("✗ " + url + ": " + (e.message || e), "warn", "LOAD"); }
+      finally { clearTimeout(to); }
+    }
+    throw new Error(label + ": alle Quellen fehlgeschlagen (" + (last && last.message) + ")");
+  }
+  function overlay(show, title, sub, pct) {
+    $("overlay").className = show ? "show" : "";
+    if (title != null) $("ov-title").textContent = title;
+    if (sub != null) $("ov-sub").textContent = sub;
+    if (pct != null) $("ov-bar").style.width = pct + "%";
+  }
+  async function ensureAssets() {
+    if (S.assets) return;
+    overlay(true, "Lade Hypervisor …", "libv86.js + BIOS", 5);
+    await ensureV86();
+    const bios = await fetchBuf(BIOS_BASES.map((b) => b + "seabios.bin"), "SeaBIOS", (g, t) => overlay(true, null, "SeaBIOS", 20 + (t ? (g / t) * 30 : 0)));
+    const vga = await fetchBuf(BIOS_BASES.map((b) => b + "vgabios.bin"), "VGA-BIOS", (g, t) => overlay(true, null, "VGA-BIOS", 55 + (t ? (g / t) * 30 : 0)));
+    S.assets = { bios, vga };
+    log("BIOS-Dateien geladen (" + bios.byteLength + " + " + vga.byteLength + " Bytes).", "ok", "LOAD");
+  }
+
+  // ====================================================================
+  // Emulator starten
+  // ====================================================================
+  function recreateScreen() {
+    const c = $("screen_container");
+    c.innerHTML = "<div></div><canvas></canvas>";
+    applyTextScale();
+    return c;
+  }
+  function destroyEmu() {
+    if (S.timer) { clearInterval(S.timer); S.timer = null; }
+    if (S.emu) { try { S.emu.destroy(); } catch (e) { /* egal */ } S.emu = null; }
+  }
+  function scheduleRender() {
+    if (S.rafPending) return; S.rafPending = true;
+    requestAnimationFrame(() => {
+      S.rafPending = false;
+      let last = ""; const rows = [];
+      for (let r = 0; r < S.grid.length; r++) { const row = S.grid[r]; const t = row ? row.join("").replace(/\s+$/, "") : ""; rows.push(t); if (t) last = t; }
+      $("vga-last").textContent = last || "Warte auf BIOS-Ausgabe …";
+      $("vga-n").textContent = S.g.chars + " Zeichen";
+      $("log-txt").textContent = rows.join("\n").replace(/\n+$/, "");
+      setBadge("b-ser", S.g.serial + " B");
+      const ls = $("log-ser"); if (ls.textContent.length !== S.serial.length) { ls.textContent = S.serial; ls.scrollTop = ls.scrollHeight; }
+    });
+  }
+  function wire(emu) {
+    emu.add_listener("emulator-ready", () => { log("Emulator initialisiert (BIOS + Gerät bereit) – das ist NOCH KEIN Beweis, dass das OS bootet.", "info", "EMU"); phase("ph-ready", "ok"); });
+    emu.add_listener("emulator-started", () => { phase("ph-ready", "ok"); phase("ph-bios", "run"); });
+    emu.add_listener("download-error", (e) => { log("Download-Fehler: " + (e && e.file_name ? e.file_name : "Datei"), "err", "EMU"); });
+    emu.add_listener("screen-set-size", (a) => {
+      const w = a[0], h = a[1], bpp = a[2];
+      S.g.video = bpp ? "GRAFIK " + w + "×" + h + "×" + bpp : "TEXT " + w + "×" + h;
+      setBadge("b-video", S.g.video);
+      if (bpp && S.g.bootFound) { S.g.gfx++; log("Gast schaltet Grafikmodus " + w + "×" + h + "×" + bpp, "ok", "VGA"); }
+    });
+    emu.add_listener("screen-put-char", (a) => {
+      const r = a[0], c = a[1], ch = a[2];
+      S.g.chars++; if (S.g.bootFound) S.g.charsAfterBoot++;
+      const row = S.grid[r] || (S.grid[r] = []);
+      row[c] = ch >= 32 && ch < 127 ? String.fromCharCode(ch) : " ";
+      for (let i = 0; i < c; i++) if (row[i] === undefined) row[i] = " ";
+      S.roll += ch >= 32 && ch < 127 ? String.fromCharCode(ch) : " ";
+      if (S.roll.length > 4000) S.roll = S.roll.slice(-2000);
+      if (ch === 110 && S.roll.endsWith("SeaBIOS (version")) { S.g.banners++; phase("ph-bios", "ok"); if (S.g.banners > 1) log("SeaBIOS-Banner zum " + S.g.banners + ". Mal: Gast hat neu gestartet (Reset/Triple-Fault-Schleife?).", "warn", "VGA"); }
+      if (ch === 46 && S.roll.endsWith("...")) {
+        const m = /Booting from (.+?)\.\.\.$/.exec(S.roll);
+        if (m && !S.g.bootFound) { S.g.bootFound = true; S.g.bootAt = performance.now(); S.g.charsAfterBoot = 0; phase("ph-dev", "ok", m[1]); phase("ph-guest", "run"); log("BIOS bootet von: " + m[1], "ok", "BIOS"); }
+      }
+      if (ch === 100 && S.roll.endsWith("Boot failed")) { phase("ph-dev", "err", "BIOS meldet Boot failed"); showAlert("BOOT_FAILED", "SeaBIOS meldet „Boot failed“. Das Image hat keinen gültigen Bootsektor (0x55AA) oder das falsche Laufwerk (hda/fda/cdrom) wurde gewählt."); }
+      if (S.g.bootFound && guestAlive() > 0) phase("ph-guest", "ok");
+      scheduleRender();
+    });
+    emu.add_listener("serial0-output-byte", (b) => {
+      S.g.serial++; S.serial += String.fromCharCode(b);
+      if (S.serial.length > 20000) S.serial = S.serial.slice(-10000);
+      if (S.g.bootFound) phase("ph-guest", "ok", "COM1");
+      scheduleRender();
+    });
+    emu.add_listener("mouse-enable", (en) => { if (en) { S.g.mouse = true; log("Gast hat die PS/2-Maus aktiviert.", "ok", "INPUT"); if (S.g.bootFound) phase("ph-guest", "ok", "Maus"); } });
+    emu.add_listener("ide-read-start", () => { S.g.ide++; });
+  }
+  async function startEmu(config, label, ramMB) {
+    destroyEmu(); resetGuest(); resetPhases(); hideAlert();
+    $("log-ser").textContent = ""; $("log-txt").textContent = ""; $("vga-last").textContent = "Warte auf BIOS-Ausgabe …";
+    S.label = label; S.paused = false; $("btn-pause").textContent = "⏸ Pause";
+    try {
+      phase("ph-assets", "run");
+      await ensureAssets();
+      phase("ph-assets", "ok");
+      const container = recreateScreen();
+      const mb = ramMB || 64;
+      setBadge("b-ram", mb + " MB"); setBadge("b-engine", "v86 x86-JIT"); setBadge("b-video", "TEXT 80×25");
+      const opts = Object.assign({
+        wasm_path: S.base + "v86.wasm", memory_size: mb * 1048576, vga_memory_size: 8 * 1048576,
+        screen_container: container, bios: { buffer: S.assets.bios.slice(0) }, vga_bios: { buffer: S.assets.vga.slice(0) }, autostart: true
+      }, config);
+      log("Starte „" + label + "“ mit " + mb + " MB RAM …", "info", "EMU");
+      overlay(false);
+      S.t0 = performance.now();
+      S.emu = new window.V86(opts);
+      wire(S.emu);
+      S.timer = setInterval(tick, 1000);
+    } catch (e) {
+      overlay(false); phase("ph-assets", "err");
+      showAlert("START_FEHLER", String(e && e.message ? e.message : e) + "\n\nTipp: Prüfe die Internetverbindung. Die eingebauten VibeOS-Images brauchen nur libv86.js + BIOS vom CDN.", { alt: false });
+    }
+  }
+
+  // ====================================================================
+  // Watchdog: ehrliche Diagnose statt „läuft!“
+  // ====================================================================
+  function tick() {
+    if (!S.emu) return;
+    let mips = null;
+    try { const c = S.emu.get_instruction_counter(); mips = (c - S.lastIns) / 1e6; S.lastIns = c; } catch (e) { /* optional */ }
+    if (mips != null && !S.paused) setBadge("b-cpu", mips.toFixed(1) + " MIPS");
+    const now = performance.now(), g = S.g;
+    if (!g.bootFound && !g.warnedNoBoot && now - S.t0 > 20000) {
+      g.warnedNoBoot = true; phase("ph-dev", "err", "nach 20 s nichts");
+      showAlert("KEIN_BOOT_GERAET", "Nach 20 s hat SeaBIOS kein „Booting from …“ ausgegeben. Mögliche Ursachen: Image zu groß für den Download, falsches Laufwerk gewählt oder Emulator hängt.\nVGA-Text:\n" + gridText().slice(0, 400));
+    }
+    if (g.bootFound && !g.warnedSilent && guestAlive() === 0 && now - g.bootAt > 8000) {
+      g.warnedSilent = true; phase("ph-guest", "err", "keine Ausgabe seit 8 s");
+      const a = S.analysis;
+      let m = "Das BIOS hat den Bootsektor gestartet, aber der Gast hat seit 8 s weder Text, Grafik, COM1 noch Maus benutzt.\n";
+      if (a && a.needs64) m += "\nWahrscheinlichste Ursache (laut Analyse): Dein Image enthält einen x86_64-Kernel / Long-Mode-Wechsel. v86 unterstützt keine 64-Bit-Kernel – Stage 3 des Bootloaders scheitert und der Bildschirm bleibt schwarz.";
+      else m += "\nMögliche Ursachen: Kernel zeichnet nur in einen VESA-Framebuffer, hängt in einer Schleife oder nutzt Hardware, die v86 nicht hat.";
+      if (mips != null) m += "\nCPU-Last: " + mips.toFixed(1) + " MIPS (" + (mips < 0.05 ? "CPU steht in HLT/Halt" : "CPU läuft, vermutlich Schleife") + ").";
+      showAlert("GAST_STUMM", m, { alt: true });
+    }
+    if (g.banners >= 3 && !g.warnedLoop) {
+      g.warnedLoop = true; phase("ph-guest", "err", "Neustart-Schleife");
+      showAlert("NEUSTART_SCHLEIFE", "Das BIOS-Banner erschien " + g.banners + "× – der Gast startet immer wieder neu (typisch bei Triple-Fault, z. B. durch einen 64-Bit-/Long-Mode-Übergang).", { alt: true });
+    }
+  }
+  function gridText() { return S.grid.map((r) => (r ? r.join("").replace(/\s+$/, "") : "")).join("\n").replace(/\n+$/, ""); }
+
+  // ====================================================================
+  // Image-Analyse
+  // ====================================================================
+  function findSeq(u8, seq, limit) {
+    const n = Math.min(u8.length, limit || u8.length) - seq.length;
+    outer: for (let i = 0; i <= n; i++) { for (let j = 0; j < seq.length; j++) if (u8[i + j] !== seq[j]) continue outer; return i; }
+    return -1;
+  }
+  function analyzeImage(buf, name) {
+    const u = new Uint8Array(buf), a = { name, size: u.length, notes: [] };
+    a.mbr = u.length >= 512 && u[510] === 0x55 && u[511] === 0xAA;
+    a.iso = u.length > 0x8006 && String.fromCharCode(u[0x8001], u[0x8002], u[0x8003], u[0x8004], u[0x8005]) === "CD001";
+    a.parts = [];
+    if (a.mbr) for (let i = 0; i < 4; i++) {
+      const o = 446 + i * 16, type = u[o + 4];
+      if (type) a.parts.push({ n: i + 1, boot: u[o] === 0x80, type, lba: u[o + 8] | (u[o + 9] << 8) | (u[o + 10] << 16) | (u[o + 11] << 24), sectors: (u[o + 12] | (u[o + 13] << 8) | (u[o + 14] << 16) | (u[o + 15] << 24)) >>> 0 });
+    }
+    a.int13ext = findSeq(u, [0xB4, 0x41, 0xBB, 0xAA, 0x55, 0xCD, 0x13], 1024) >= 0;
+    a.xorStart = u.length > 4 && u[0] === 0x31 && u[1] === 0xC0 && u[2] === 0x8E && u[3] === 0xD8;
+    // ELF-Header im ganzen Image (bis 64 MB) – Kernel liegt bei bootloader-Images roh im FAT-Dateisystem
+    a.elf = [];
+    const lim = Math.min(u.length - 20, 64 * 1048576);
+    for (let i = 0; i < lim && a.elf.length < 6; i++) {
+      if (u[i] === 0x7F && u[i + 1] === 0x45 && u[i + 2] === 0x4C && u[i + 3] === 0x46) {
+        const cls = u[i + 4], mach = u[i + 18] | (u[i + 19] << 8);
+        if ((cls === 1 || cls === 2) && u[i + 5] === 1 && (mach === 0x3E || mach === 0x03 || mach === 0x28 || mach === 0xB7 || mach === 0xF3)) a.elf.push({ off: i, bits: cls === 2 ? 64 : 32, mach });
+      }
+    }
+    a.elf64 = a.elf.some((e) => e.bits === 64 && e.mach === 0x3E);
+    a.elf32 = a.elf.some((e) => e.bits === 32 && e.mach === 0x03);
+    a.elfOther = a.elf.some((e) => e.mach === 0x28 || e.mach === 0xB7 || e.mach === 0xF3);
+    // Long-Mode-Befehlsmuster: mov ecx,0xC0000080 ; rdmsr  /  mov eax,0x80000001 ; cpuid
+    const scan = u.subarray(0, Math.min(u.length, 16 * 1048576));
+    a.efer = findSeq(scan, [0xB9, 0x80, 0x00, 0x00, 0xC0, 0x0F, 0x32]) >= 0;
+    a.cpuidExt = findSeq(scan, [0xB8, 0x01, 0x00, 0x00, 0x80, 0x0F, 0xA2]) >= 0;
+    a.fat = u.length > 512 && (String.fromCharCode.apply(null, u.subarray(54, 59)) === "FAT12" || String.fromCharCode.apply(null, u.subarray(54, 59)) === "FAT16" || String.fromCharCode.apply(null, u.subarray(82, 87)) === "FAT32");
+    a.needs64 = a.elf64 || (a.efer && a.int13ext);
+    a.rustLike = a.xorStart && a.int13ext;
+    const lower = (name || "").toLowerCase();
+    if (a.iso || lower.endsWith(".iso")) a.drive = "cdrom";
+    else if (FLOPPY_SIZES.indexOf(u.length) >= 0 && a.parts.length === 0) a.drive = "fda";
+    else a.drive = "hda";
+    return a;
+  }
+  function renderAnalysis(a) {
+    const rows = [];
+    const add = (cls, t) => rows.push('<div class="' + cls + '">' + t + "</div>");
+    add("a-inf", "Datei: <b>" + a.name.replace(/[<&]/g, "") + "</b> · " + (a.size / 1024).toFixed(1) + " KB");
+    add(a.mbr ? "a-ok" : "a-warn", (a.mbr ? "✔" : "⚠") + " Bootsignatur 0x55 0xAA bei Offset 510" + (a.mbr ? "" : " fehlt (nur ISO/Spezialformate ok)"));
+    if (a.iso) add("a-ok", "✔ ISO-9660 (CD001) erkannt → CD-ROM");
+    if (a.parts.length) add("a-inf", "Partitionen: " + a.parts.map((p) => "#" + p.n + (p.boot ? "*" : "") + " Typ 0x" + hex(p.type) + " LBA " + p.lba).join(" · "));
+    if (a.fat) add("a-inf", "FAT-Dateisystem im Bootsektor erkannt");
+    if (a.int13ext) add("a-inf", "Bootsektor nutzt INT 13h AH=41h (LBA-Erweiterung)" + (a.rustLike ? " – Muster passt zum Rust-<i>bootloader</i>" : ""));
+    if (a.elf.length) add("a-inf", "ELF-Header im Image: " + a.elf.map((e) => "ELF" + e.bits + " (machine 0x" + hex(e.mach) + ") @0x" + e.off.toString(16)).join(", "));
+    if (a.efer) add("a-warn", "Long-Mode-Muster (EFER-MSR 0xC0000080 lesen) gefunden");
+    if (a.cpuidExt) add("a-inf", "CPUID-Check 0x80000001 (Long-Mode-Test) gefunden");
+    if (a.needs64) add("a-bad", "✖ <b>x86_64-Kernel erkannt – v86 kann 64-Bit-Kernel NICHT ausführen.</b>");
+    else if (a.elfOther) add("a-warn", "⚠ ELF für ARM/RISC-V gefunden – das läuft nicht auf x86.");
+    else add("a-ok", "✔ Kein 64-Bit-Hinweis gefunden – Start sollte in v86 möglich sein.");
+    add("a-inf", "Empfohlenes Laufwerk: <b>" + a.drive + "</b>");
+    const el = $("analysis"); el.innerHTML = rows.join(""); el.className = "show";
+  }
+  function renderHex(u8, label) {
+    const b = $("hex-badge"), el = $("hex");
+    const ok = u8.length >= 512 && u8[510] === 0x55 && u8[511] === 0xAA;
+    b.textContent = u8.length >= 512 ? (ok ? "MBR 0x55 0xAA ✔" : "Ende 0x" + hex(u8[510]) + " 0x" + hex(u8[511])) : u8.length + " Bytes";
+    b.style.color = ok ? "#6ee7b7" : "#fcd34d";
+    const row = (o) => { let h = "", t = ""; for (let i = 0; i < 16; i++) { const v = u8[o + i]; if (v === undefined) { h += "   "; continue; } h += hex(v) + " "; t += v >= 32 && v < 127 ? String.fromCharCode(v) : "."; } return hex(o, 4) + ": " + h + " |" + t + "|\n"; };
+    let out = "--- " + label + " (" + u8.length + " B, erste 512 B) ---\n";
+    const n = Math.min(u8.length, 512);
+    for (let o = 0; o < Math.min(n, 192); o += 16) out += row(o);
+    if (n > 192) { out += "… \n"; for (let o = 480; o < n; o += 16) out += row(o); }
+    el.textContent = out;
+  }
+
+  // ====================================================================
+  // Image-Start
+  // ====================================================================
+  function padTo(buf, size) { const o = new Uint8Array(size); o.set(new Uint8Array(buf)); return o.buffer; }
+  function floppyBuffer(buf) {
+    const len = buf.byteLength;
+    for (const s of FLOPPY_SIZES) if (len <= s) return len === s ? buf : padTo(buf, s);
+    throw new Error("Image (" + len + " B) ist größer als eine 2,88-MB-Diskette – wähle hda oder cdrom.");
+  }
+  function startFromBuffer(buf, drive, name) {
+    const ram = parseInt($("ram").value, 10) || 128;
+    let cfg = {};
+    if (drive === "fda") cfg.fda = { buffer: floppyBuffer(buf) };
+    else if (drive === "cdrom") cfg.cdrom = { buffer: buf };
+    else cfg.hda = { buffer: buf.byteLength % 512 ? padTo(buf, Math.ceil(buf.byteLength / 512) * 512) : buf };
+    return startEmu(cfg, "Eigenes Image (" + name + ", " + drive + ")", ram);
+  }
+  async function onFile(file) {
+    if (!file) return;
+    try {
+      log("Lese „" + file.name + "“ (" + (file.size / 1024).toFixed(1) + " KB) …", "info", "FILE");
+      const buf = await file.arrayBuffer();
+      const a = analyzeImage(buf, file.name);
+      S.analysis = a; renderAnalysis(a); renderHex(new Uint8Array(buf, 0, Math.min(512, buf.byteLength)), file.name);
+      const sel = $("drive-type").value, drive = sel === "auto" ? a.drive : sel;
+      S.pending = { buf, drive, name: file.name };
+      if (a.needs64) {
+        showAlert("X86_64_NICHT_UNTERSTUETZT",
+          "Analyse: „" + file.name + "“ enthält einen x86_64-Kernel" + (a.rustLike ? " (Rust-bootloader-Muster)" : "") + ".\n\n" +
+          "v86 emuliert nur 32-Bit-x86 und unterstützt keine 64-Bit-Kernel. Der Bootloader (Stage 1/2) läuft zwar an, scheitert aber beim Wechsel in den Long-Mode – das erklärt den schwarzen Bildschirm.\n\n" +
+          "Lösungen: (A) Kernel als 32-Bit (i686) bauen, (B) Emulator mit x86_64-Support (QEMU-Wasm/Bochs-Wasm) nutzen. Mit „Trotzdem starten“ kannst du das Verhalten selbst prüfen.",
+          { force: true, alt: true });
+        return;
+      }
+      await startFromBuffer(buf, drive, file.name);
+    } catch (e) { crash("Image konnte nicht verarbeitet werden", e); }
+  }
+
+  // ====================================================================
+  // Eingebaute Images & Remote-OS
+  // ====================================================================
+  function builtin(b64s, name, drive) {
+    const raw = b64(b64s), img = new Uint8Array(1474560); img.set(raw);
+    renderHex(img.subarray(0, 512), name);
+    S.analysis = null;
+    return startEmu({ fda: { buffer: img.buffer } }, name, 32);
+  }
+  async function remote(file, drive, label, ram) {
+    try {
+      await ensureAssets().catch(() => { /* Fehler zeigt startEmu */ });
+      overlay(true, "Lade " + label, file, 0);
+      const buf = await fetchBuf(IMG_BASES.map((b) => b + file), label, (g, t) => overlay(true, null, (g / 1048576).toFixed(1) + " MB" + (t ? " / " + (t / 1048576).toFixed(1) + " MB" : ""), t ? (g / t) * 100 : 50));
+      overlay(false);
+      renderHex(new Uint8Array(buf, 0, Math.min(512, buf.byteLength)), file);
+      S.analysis = analyzeImage(buf, file);
+      const cfg = {}; cfg[drive] = { buffer: drive === "fda" ? floppyBuffer(buf) : buf };
+      await startEmu(cfg, label, ram);
+    } catch (e) {
+      overlay(false);
+      showAlert("DOWNLOAD_FEHLGESCHLAGEN", String(e.message || e) + "\n\nMögliche Ursachen: kein Internet, CORS-Sperre bei content://-Dateien oder Server nicht erreichbar.\nAusweg: Datei im Browser von " + IMG_BASES[0] + file + " herunterladen und über „Eigenes Image“ laden.");
+    }
+  }
+
+  // ====================================================================
+  // Eingabe: Tastatur, Maus, Touchpad
+  // ====================================================================
+  const KEYS = { Enter: [0x1C], Esc: [0x01], Tab: [0x0F], Backspace: [0x0E], Space: [0x39], Up: [0xE0, 0x48], Down: [0xE0, 0x50], Left: [0xE0, 0x4B], Right: [0xE0, 0x4D] };
+  function sendKey(name) {
+    const make = KEYS[name]; if (!make || !S.emu) return;
+    const brk = make.length === 2 ? [0xE0, make[1] | 0x80] : [make[0] | 0x80];
+    try { S.emu.keyboard_send_scancodes(make.concat(brk)); } catch (e) { log("Taste fehlgeschlagen: " + e, "err", "INPUT"); }
+  }
+  function sendText(t, enter) {
+    if (!S.emu) { log("Kein laufendes System.", "warn", "INPUT"); return; }
+    try { S.emu.keyboard_send_text(enter ? t + "\n" : t); log("Gesendet: " + t, "info", "INPUT"); } catch (e) { log("Senden fehlgeschlagen: " + e, "err", "INPUT"); }
+  }
+  function mouseDelta(dx, dy) { if (S.emu && S.emu.bus) S.emu.bus.send("mouse-delta", [dx, -dy]); }
+  function mouseBtn(l, m, r) { if (S.emu && S.emu.bus) S.emu.bus.send("mouse-click", [!!l, !!m, !!r]); }
+  function clickOnce(btn) { const st = [btn === 0, false, btn === 2]; mouseBtn(st[0], st[1], st[2]); setTimeout(() => mouseBtn(S.drag, false, false), 70); }
+  function initPad() {
+    const pad = $("pad"); let last = null, t0 = 0, moved = 0, ax = 0, ay = 0;
+    pad.addEventListener("pointerdown", (e) => { try { pad.setPointerCapture(e.pointerId); } catch (x) { /* ok */ } last = { x: e.clientX, y: e.clientY }; t0 = performance.now(); moved = 0; e.preventDefault(); });
+    pad.addEventListener("pointermove", (e) => {
+      if (!last) return;
+      ax += (e.clientX - last.x) * S.sens; ay += (e.clientY - last.y) * S.sens; moved += Math.abs(e.clientX - last.x) + Math.abs(e.clientY - last.y);
+      last = { x: e.clientX, y: e.clientY };
+      const ix = Math.trunc(ax), iy = Math.trunc(ay);
+      if (ix || iy) { ax -= ix; ay -= iy; mouseDelta(ix, iy); }
+      e.preventDefault();
+    });
+    const up = () => { if (!last) return; last = null; if (moved < 8 && performance.now() - t0 < 350) clickOnce(0); };
+    pad.addEventListener("pointerup", up);
+    pad.addEventListener("pointercancel", () => { last = null; });
+  }
+
+  // ====================================================================
+  // UI-Hilfen
+  // ====================================================================
+  function applyTextScale() {
+    const w = $("screen-wrap").clientWidth || 360;
+    const base = Math.max(6, Math.min(14, (w - 14) / 48));
+    document.documentElement.style.setProperty("--tfs", (base * S.tz).toFixed(2) + "px");
+  }
+  function report() {
+    return [
+      "=== WASM OS STUDIO v3 – DIAGNOSE-REPORT ===",
+      "Zeit: " + new Date().toISOString(), "URL: " + location.href, "UA: " + navigator.userAgent,
+      "WebAssembly: " + (typeof WebAssembly === "object" ? "ja" : "NEIN"), "v86-Quelle: " + (S.base || "nicht geladen"),
+      "System: " + (S.label || "keines"), "Video: " + S.g.video,
+      "Phasen: bootFound=" + S.g.bootFound + " chars=" + S.g.chars + " nachBoot=" + S.g.charsAfterBoot + " gfx=" + S.g.gfx + " serial=" + S.g.serial + " maus=" + S.g.mouse + " ideReads=" + S.g.ide + " biosBanner=" + S.g.banners,
+      "Analyse: " + (S.analysis ? JSON.stringify(S.analysis) : "(eingebautes/Remote-Image)"),
+      "", "--- COM1 ---", S.serial || "(leer)", "", "--- VGA-TEXT ---", gridText() || "(leer)", "", "--- LOG ---", S.history.join("\n")
+    ].join("\n");
+  }
+  function download(bytes, name) {
+    const url = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }));
+    const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000); log("Export: " + name + " (" + bytes.length + " B)", "ok", "FILE");
+  }
+  function wasmDemo() {
+    // Korrekt aufgebautes Mini-Modul: Längen werden berechnet, nicht von Hand gezählt
+    const leb = (n) => { const o = []; do { let b = n & 0x7F; n >>>= 7; if (n) b |= 0x80; o.push(b); } while (n); return o; };
+    const sec = (id, bytes) => [id].concat(leb(bytes.length), bytes);
+    const str = (s) => leb(s.length).concat(Array.from(s).map((c) => c.charCodeAt(0)));
+    const types = [2, 0x60, 0, 1, 0x7F, 0x60, 2, 0x7F, 0x7F, 1, 0x7F];
+    const funcs = [2, 0, 1];
+    const exps = [2].concat(str("kernel_version"), [0, 0], str("checksum"), [0, 1]);
+    const b0 = [0, 0x41].concat([0xEA, 0x0F], [0x0B]);                 // i32.const 2026
+    const b1 = [0, 0x20, 0, 0x41, 0x1F, 0x6C, 0x20, 1, 0x6A, 0x0B];   // a*31+b
+    const code = [2].concat(leb(b0.length), b0, leb(b1.length), b1);
+    const bytes = new Uint8Array([0, 0x61, 0x73, 0x6D, 1, 0, 0, 0].concat(sec(1, types), sec(3, funcs), sec(7, exps), sec(10, code)));
+    return WebAssembly.instantiate(bytes).then((r) => "Wasm-Modul gültig (" + bytes.length + " B): kernel_version()=" + r.instance.exports.kernel_version() + ", checksum(42,1337)=" + r.instance.exports.checksum(42, 1337));
+  }
+
+  // ====================================================================
+  // Events verdrahten
+  // ====================================================================
+  function bind(id, ev, fn) {
+    const el = $(id); if (!el) { console.warn("Element fehlt: " + id); return; }
+    el.addEventListener(ev, (e) => { try { const r = fn(e); if (r && r.catch) r.catch((x) => crash("Aktion " + id, x)); } catch (x) { crash("Aktion " + id, x); } });
+  }
+  function init() {
+    setBadge("b-ram", "–");
+    bind("b-desktop", "click", () => builtin(B64_DESKTOP, "VibeOS Desktop", "fda"));
+    bind("b-shell", "click", () => builtin(B64_SHELL, "VibeOS Text-Shell", "fda"));
+    bind("b-kolibri", "click", () => remote("kolibri.img", "fda", "KolibriOS", 128));
+    bind("b-linux", "click", () => remote("linux4.iso", "cdrom", "Buildroot Linux 4", 128));
+    bind("b-dos", "click", () => remote("freedos722.img", "fda", "FreeDOS 722K", 64));
+    bind("file", "change", (e) => onFile(e.target.files && e.target.files[0]));
+    bind("btn-force", "click", () => { hideAlert(); if (S.pending) return startFromBuffer(S.pending.buf, S.pending.drive, S.pending.name); });
+    bind("btn-alt-desktop", "click", () => { hideAlert(); return builtin(B64_DESKTOP, "VibeOS Desktop", "fda"); });
+    bind("btn-dismiss", "click", hideAlert);
+    bind("btn-copy-err", "click", () => copyText($("alert-title").textContent + "\n" + $("alert-msg").textContent, "Fehlertext"));
+    bind("btn-report", "click", () => copyText(report(), "Diagnose-Report"));
+    bind("btn-reboot", "click", () => { if (S.emu) { resetGuest(); resetPhases(); phase("ph-assets", "ok"); S.emu.restart(); S.t0 = performance.now(); log("Neustart ausgelöst.", "warn", "EMU"); } });
+    bind("btn-cad", "click", () => { if (S.emu) S.emu.keyboard_send_scancodes([0x1D, 0x38, 0xE0, 0x53, 0xE0, 0xD3, 0xB8, 0x9D]); });
+    bind("btn-full", "click", () => { const el = $("screen-wrap"); const f = el.requestFullscreen || el.webkitRequestFullscreen; if (f) f.call(el); else log("Vollbild wird hier nicht unterstützt.", "warn", "UI"); });
+    bind("btn-tplus", "click", () => { S.tz = Math.min(3, S.tz * 1.2); applyTextScale(); });
+    bind("btn-tminus", "click", () => { S.tz = Math.max(0.5, S.tz / 1.2); applyTextScale(); });
+    bind("btn-pause", "click", () => { if (!S.emu) return; if (S.paused) { S.emu.run(); S.paused = false; $("btn-pause").textContent = "⏸ Pause"; } else { S.emu.stop(); S.paused = true; $("btn-pause").textContent = "▶ Weiter"; } });
+    document.querySelectorAll("[data-key]").forEach((b) => b.addEventListener("click", () => sendKey(b.getAttribute("data-key"))));
+    document.querySelectorAll("[data-cmd]").forEach((b) => b.addEventListener("click", () => sendText(b.getAttribute("data-cmd"), true)));
+    bind("kbd-send", "click", () => { const i = $("kbd"); if (i.value) { sendText(i.value, true); i.value = ""; } });
+    const kb = $("kbd");
+    kb.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("kbd-send").click(); } e.stopPropagation(); });
+    kb.addEventListener("focus", () => { try { if (S.emu) S.emu.keyboard_set_status(false); } catch (e) { /* ok */ } });
+    kb.addEventListener("blur", () => { try { if (S.emu) S.emu.keyboard_set_status(true); } catch (e) { /* ok */ } });
+    bind("m-left", "click", () => clickOnce(0));
+    bind("m-right", "click", () => clickOnce(2));
+    bind("m-drag", "click", () => { S.drag = !S.drag; $("m-drag").textContent = "✋ Ziehen: " + (S.drag ? "an" : "aus"); mouseBtn(S.drag, false, false); });
+    bind("m-sens", "change", (e) => { S.sens = parseFloat(e.target.value) || 1.4; });
+    initPad();
+    const tabs = { "tab-sys": "log-sys", "tab-ser": "log-ser", "tab-txt": "log-txt" };
+    Object.keys(tabs).forEach((t) => bind(t, "click", () => { Object.keys(tabs).forEach((k) => { $(k).classList.toggle("on", k === t); $(tabs[k]).style.display = k === t ? "" : "none"; }); }));
+    bind("btn-clear", "click", () => { $("log-sys").innerHTML = ""; S.history.length = 0; });
+    bind("x-desktop", "click", () => { const i = new Uint8Array(1474560); i.set(b64(B64_DESKTOP)); download(i, "vibeos_desktop.img"); });
+    bind("x-shell", "click", () => { const i = new Uint8Array(1474560); i.set(b64(B64_SHELL)); download(i, "vibeos_shell.img"); });
+    bind("x-wasm", "click", () => wasmDemo().then((t) => { $("wasm-out").textContent = t; log(t, "ok", "WASM"); }).catch((e) => { $("wasm-out").textContent = "Fehler: " + e; }));
+    window.addEventListener("resize", applyTextScale);
+    applyTextScale();
+    if (typeof WebAssembly !== "object") showAlert("KEIN_WEBASSEMBLY", "Dieser Browser unterstützt WebAssembly nicht – v86 kann nicht laufen.");
+    log("Bereit. Tippe auf „VibeOS Desktop“ für einen sofort lauffähigen Test.", "ok", "UI");
+    // Auto-Start: eingebautes Desktop-Image, damit sofort etwas Sichtbares läuft
+    builtin(B64_DESKTOP, "VibeOS Desktop", "fda");
+  }
+  window.__studio = { analyzeImage, S }; // für Tests
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
+})();
+</script>
+</body>
+</html>
