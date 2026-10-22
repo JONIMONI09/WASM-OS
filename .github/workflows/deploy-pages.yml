@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,7 +16,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: ESLint Check
+        run: npx eslint js/
+
+      - name: Start Local Test Server
+        run: npx serve . -p 8080 &
+        env:
+          PORT: 8080
+
+      - name: Wait for server
+        run: sleep 3
+
+      - name: Run Playwright Verification Script
+        run: node tests/verify-hypervisor.mjs
+
   deploy:
+    needs: lint_and_test
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
