@@ -17,6 +17,20 @@ import { chromium } from 'playwright';
         console.log("✅ Engine successfully detected as riscv64");
         console.log("✅ Engine successfully detected as aarch64");
         console.log("✅ All Falsifiability & Multi-Arch checks passed on Playwright Sandbox!");
+
+        // Phase UI Test
+        console.log("Testing Hypervisor Boot Phase UI...");
+        await page.evaluate(() => {
+            window.phase("ph-assets", "ok");
+        });
+        const elClass = await page.evaluate(() => document.getElementById("ph-assets").className);
+        const elText = await page.evaluate(() => document.getElementById("ph-assets").textContent);
+
+        if (!elClass.includes("ph ok") || !elText.includes("✔")) {
+            throw new Error(`UI Phase Test Failed! Expected 'ph ok' and '✔', got class: '${elClass}', text: '${elText}'`);
+        }
+        console.log("✅ Phase UI Test Passed: Successfully updated 'ph-assets' element class and text content!");
+
     } catch (e) {
         console.error("Test failed:", e);
         process.exit(1);
