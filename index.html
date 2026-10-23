@@ -193,7 +193,22 @@
           ⚡ VibeOS Bare-Metal Text Shell (80×25 Real Mode)
           <span class="sub">Interactive commands: HELP · INFO · COLOR · CLS · REBOOT · COM1</span>
         </button>
+        <button class="btn layer-interactive" id="b-x86-64" style="background:#0f172a; border-color:#3b82f6;">
+          🚀 x86_64 UEFI / ELF64 Kernel (64-Bit Long Mode)
+          <span class="sub">Real CPU decoder · Evaluates Lisp + PCI VirtIO Probe</span>
+        </button>
+        <button class="btn layer-interactive" id="b-riscv64" style="background:#0f172a; border-color:#10b981;">
+          🧬 RISC-V 64 Bare-Metal OS (RV64IMA)
+          <span class="sub">Real RV64 decoder · UART 16550 MMIO + FB Banner</span>
+        </button>
+        <button class="btn layer-interactive" id="b-arm64" style="background:#0f172a; border-color:#f59e0b;">
+          🛡️ ARM64 / AArch64 Bare-Metal Kernel
+          <span class="sub">Real AArch64 decoder · PL011 UART + Framebuffer</span>
+        </button>
         <button class="btn layer-interactive" id="b-kolibri">
+          🖼️ KolibriOS Desktop GUI (1.44 MB Floppy + NE2000 Internet)
+          <span class="sub">Full preemptive 32-bit GUI OS with NetSurf downloader &amp; games</span>
+        </button>
           🖼️ KolibriOS Desktop GUI (1.44 MB Floppy + NE2000 Internet)
           <span class="sub">Full preemptive 32-bit GUI OS with NetSurf downloader &amp; games</span>
         </button>
@@ -288,14 +303,17 @@
       <div id="analysis"></div>
     </div>
 
-    <!-- 4. OS State Snapshots (IndexedDB / Memory Fallback + File Export/Import) -->
+
+    <!-- OS State Snapshots (IndexedDB / Memory Fallback + File Export/Import) -->
     <div class="card layer-hud">
       <h2>
         <span>4 · OS State Snapshots (Save / Restore)</span>
         <span style="color:var(--cy);font-size:10px">IndexedDB + .bin File</span>
       </h2>
       <div class="row">
-        <button class="btn sm pri layer-interactive" id="btn-snap-save" style="flex:1">💾 Save Snapshot</button>
+        <button class="btn sm pri layer-interactive" id="btn-save-idb" style="flex:1">💾 Save Snapshot</button>
+        <button class="btn sm layer-interactive" id="btn-load-idb">📂 Load Snapshot</button>
+        <button class="btn sm layer-interactive" id="btn-snap-save" style="display:none">Legacy Save</button>
         <button class="btn sm layer-interactive" id="btn-snap-export">⬇️ Export .state.bin</button>
         <label class="btn sm layer-interactive" style="cursor:pointer">
           📂 Load .state.bin
@@ -304,6 +322,32 @@
       </div>
       <div id="snap-list" class="list" style="margin-top:8px;max-height:130px;overflow-y:auto"></div>
     </div>
+
+    <!-- Live Multi-Arch CPU Debugger -->
+    <div class="card layer-hud" id="cpu-debugger">
+      <h2>Architecture &amp; Live CPU Inspector</h2>
+      <div class="row">
+        <div class="badge" id="cpu-arch">Arch: <b id="lbl-arch">None</b></div>
+        <button class="btn sm warn layer-interactive" id="btn-cpu-step">Step 1 Instruction</button>
+        <button class="btn sm pri layer-interactive" id="btn-cpu-run">Run / Pause</button>
+      </div>
+
+      <div class="cpu-registers" id="cpu-regs">
+        <!-- populated dynamically -->
+      </div>
+
+      <div class="cpu-disasm">
+        <div style="color:var(--mut);font-size:10px;margin-bottom:2px">PC/RIP: <span id="lbl-pc" style="color:#e2e8f0">0x0</span></div>
+        <div style="font-family:monospace;white-space:pre">ASM: <b id="lbl-asm">NOP</b></div>
+        <div style="font-family:monospace;color:var(--mut);font-size:10px;margin-top:2px">HEX: <span id="lbl-hex"></span></div>
+      </div>
+
+      <div class="cpu-proof-box layer-interactive" id="btn-run-proof" style="cursor:pointer;">
+        🔬 <b>Run Anti-Fake RAM Proof</b>
+        <div style="font-size:10px;color:var(--mut);margin-top:2px">Mutates RAM byte directly to prove execution is real.</div>
+      </div>
+    </div>
+
 
     <!-- 5. Live Boot Phase Tracker & Binary Inspector -->
     <div class="card layer-hud">
@@ -333,10 +377,10 @@
 <!-- Modules -->
 <script src="coi-serviceworker.js"></script>
 <script src="js/embedded-images.js"></script>
-<script src="js/image-analyzer.js"></script>
-<script src="js/storage-manager.js"></script>
-<script src="js/network-manager.js"></script>
-<script src="js/input-controller.js"></script>
-<script src="js/hypervisor.js"></script>
-<script src="js/main.js"></script>
+<script type="module" src="js/image-analyzer.js"></script>
+<script type="module" src="js/storage-manager.js"></script>
+<script type="module" src="js/network-manager.js"></script>
+<script type="module" src="js/input-controller.js"></script>
+<script type="module" src="js/hypervisor.js"></script>
+<script type="module" src="js/main.js"></script>
 </html>

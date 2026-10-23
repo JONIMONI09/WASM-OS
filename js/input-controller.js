@@ -1,34 +1,38 @@
+
+function $(id) { return document.getElementById(id); }
+
+function download(bytes, name) { console.window.log("Download", name); }
   // 12. UNIFIED INPUT CONTROLLER (CANVAS TOUCH, TRACKPAD, POINTER LOCK)
   // ====================================================================
   const KEYS = {
     Enter: [0x1C], Esc: [0x01], Tab: [0x0F], Backspace: [0x0E], Space: [0x39],
     Up: [0xE0, 0x48], Down: [0xE0, 0x50], Left: [0xE0, 0x4B], Right: [0xE0, 0x4D]
   };
-  function sendKey(name) {
+  export function sendKey(name) {
     const make = KEYS[name];
     if (!make || !S.emu) return;
     const brk = make.length === 2 ? [0xE0, make[1] | 0x80] : [make[0] | 0x80];
     try { S.emu.keyboard_send_scancodes(make.concat(brk)); } catch (e) {}
   }
-  function sendText(t, enter) {
+  export function sendText(t, enter) {
     if (!S.emu) return;
     try {
       S.emu.keyboard_send_text(enter ? t + "\n" : t);
-      log(`Injected keystrokes: "${t}"`, "info", "INPUT");
+      window.log(`Injected keystrokes: "${t}"`, "info", "INPUT");
     } catch (e) {}
   }
-  function mouseDelta(dx, dy) {
+  export function mouseDelta(dx, dy) {
     if (S.emu && S.emu.bus) S.emu.bus.send("mouse-delta", [dx, -dy]);
   }
-  function mouseBtn(l, m, r) {
+  export function mouseBtn(l, m, r) {
     if (S.emu && S.emu.bus) S.emu.bus.send("mouse-click", [!!l, !!m, !!r]);
   }
-  function clickOnce(btn) {
+  export function clickOnce(btn) {
     const st = [btn === 0, btn === 1, btn === 2];
     mouseBtn(st[0], st[1], st[2]);
     setTimeout(() => mouseBtn(S.drag, false, false), 65);
   }
-  function toggleDragLock() {
+  export function toggleDragLock() {
     S.drag = !S.drag;
     const txt = `✋ Drag Lock: ${S.drag ? "ON" : "OFF"}`;
     $("m-drag").textContent = txt;
@@ -36,7 +40,7 @@
     mouseBtn(S.drag, false, false);
   }
 
-  function bindPointerSurface(el) {
+  export function bindPointerSurface(el) {
     let isDown = false, last = null, t0 = 0, moved = 0, ax = 0, ay = 0;
 
     el.addEventListener("pointerdown", (e) => {

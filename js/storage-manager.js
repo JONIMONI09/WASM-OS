@@ -1,6 +1,10 @@
+
+function $(id) { return document.getElementById(id); }
+
+function download(bytes, name) { console.window.log("Download", name); }
   // 6. LIMBO-STYLE BLANK VIRTUAL DISK GENERATOR (FAT16 + MBR)
   // ====================================================================
-  function createBlankFat16Disk(sizeMB) {
+  export function createBlankFat16Disk(sizeMB) {
     const totalBytes = sizeMB * 1048576;
     const totalSectors = totalBytes >>> 9;
     const buf = new ArrayBuffer(totalBytes);
@@ -83,17 +87,17 @@
     });
   }
 
-  async function saveSnapshotToIDB() {
-    if (!S.emu) {
-      log("Cannot save snapshot: No active VM running.", "warn", "STATE");
+  export async function saveSnapshotToIDB() {
+    if (!window.S.emu) {
+      window.log("Cannot save snapshot: No active VM running.", "warn", "STATE");
       return;
     }
     try {
-      log("Capturing full CPU + RAM + VGA state snapshot …", "info", "STATE");
-      const stateBuf = await saveEmulatorStateBuffer(S.emu);
+      window.log("Capturing full CPU + RAM + VGA state snapshot …", "info", "STATE");
+      const stateBuf = await saveEmulatorStateBuffer(window.S.emu);
       const rec = {
         id: "snap_" + Date.now(),
-        label: S.label || "Custom OS",
+        label: window.S.label || "Custom OS",
         ramMB: parseInt($("ram").value, 10) || 128,
         timestamp: new Date().toLocaleTimeString(),
         sizeBytes: stateBuf.byteLength,
@@ -108,10 +112,10 @@
           tx.oncomplete = res;
           tx.onerror = () => rej(tx.error);
         });
-        log(`Snapshot saved to IndexedDB: ${rec.label} (${(rec.sizeBytes / 1048576).toFixed(2)} MB)`, "ok", "STATE");
+        window.log(`Snapshot saved to IndexedDB: ${rec.label} (${(rec.sizeBytes / 1048576).toFixed(2)} MB)`, "ok", "STATE");
       } catch (dbErr) {
-        S.memSnapshots.unshift(rec);
-        log(`IndexedDB restricted (saved in-memory snapshot instead): ${rec.label}`, "warn", "STATE");
+        window.S.memSnapshots.unshift(rec);
+        window.log(`IndexedDB restricted (saved in-memory snapshot instead): ${rec.label}`, "warn", "STATE");
       }
       await refreshSnapshotList();
     } catch (e) {
@@ -119,17 +123,17 @@
     }
   }
 
-  async function restoreSnapshotBuffer(buf, desc) {
-    if (!S.emu) {
-      log("Starting default hypervisor container before restoring state …", "info", "STATE");
-      await builtin(window.B64_DESKTOP, "VibeOS Desktop");
+  export async function restoreSnapshotBuffer(buf, desc) {
+    if (!window.S.emu) {
+      window.log("Starting default hypervisor container before restoring state …", "info", "STATE");
+      if(window.builtin) await window.builtin(window.B64_DESKTOP, "VibeOS Desktop");
     }
     try {
-      log(`Restoring VM state (${desc}, ${(buf.byteLength / 1048576).toFixed(2)} MB) …`, "info", "STATE");
-      const ret = S.emu.restore_state(buf);
+      window.log(`Restoring VM state (${desc}, ${(buf.byteLength / 1048576).toFixed(2)} MB) …`, "info", "STATE");
+      const ret = window.S.emu.restore_state(buf);
       if (ret && typeof ret.then === "function") await ret;
-      log(`VM State restored: ${desc}`, "ok", "STATE");
-      forceScreenRefresh();
+      window.log(`VM State restored: ${desc}`, "ok", "STATE");
+      if(window.forceScreenRefresh) window.forceScreenRefresh();
     } catch (e) {
       crash("Snapshot Restore Failed (Make sure Guest RAM matches the saved snapshot)", e);
     }
@@ -144,13 +148,13 @@
         req.onsuccess = () => res(req.result || []);
         req.onerror = () => rej(req.error);
       });
-      return items.concat(S.memSnapshots);
+      return items.concat(window.S.memSnapshots);
     } catch (e) {
-      return S.memSnapshots.slice();
+      return window.S.memSnapshots.slice();
     }
   }
 
-  async function refreshSnapshotList() {
+  export async function refreshSnapshotList() {
     const listEl = $("snap-list");
     if (!listEl) return;
     const items = await getAllSnapshots();
@@ -177,7 +181,7 @@
       row.querySelector(`[data-restore]`).addEventListener("click", () => restoreSnapshotBuffer(item.buffer, item.label));
       row.querySelector(`[data-dl]`).addEventListener("click", () => download(new Uint8Array(item.buffer), `${item.label.replace(/\W+/g, "_")}.state.bin`));
       row.querySelector(`[data-del]`).addEventListener("click", async () => {
-        S.memSnapshots = S.memSnapshots.filter((x) => x.id !== item.id);
+        window.S.memSnapshots = window.S.memSnapshots.filter((x) => x.id !== item.id);
         try {
           const d = await openSnapDB();
           const tx = d.transaction(DB_STORE, "readwrite");
