@@ -1,7 +1,7 @@
   // 5. NETWORK ADAPTER ENGINE (WS RELAY, FETCH SLIRP + CORS, LAN MESH)
   // ====================================================================
   let origWindowFetch = null;
-  function installFetchCorsFallback() {
+  export function installFetchCorsFallback() {
     if (S.fetchPatched) return;
     S.fetchPatched = true;
     const origFetch = origWindowFetch || window.fetch.bind(window);
@@ -21,7 +21,7 @@
     };
   }
 
-  function buildNetworkConfig() {
+  export function buildNetworkConfig() {
     const card = $("net-card").value;
     const mode = $("net-mode").value;
     if (card === "none") {
@@ -69,7 +69,7 @@
     };
   }
 
-  function wireNetworkEvents(emu) {
+  export function wireNetworkEvents(emu) {
     if (S.lanChannel) {
       try { S.lanChannel.close(); } catch (e) {}
       S.lanChannel = null;

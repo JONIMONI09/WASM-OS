@@ -428,3 +428,47 @@ input[type=text], input[type=url] { flex: 1; min-width: 120px; }
   border-radius: 7px;
   font-size: 11px;
 }
+/* Additional Multi-Arch & Anti-Fake Debugger Styles */
+#cpu-debugger {
+  margin-top: 8px;
+  background: #020617;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 11px;
+}
+.cpu-registers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 4px;
+  margin-top: 6px;
+}
+.reg-box {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  padding: 3px 6px;
+  display: flex;
+  justify-content: space-between;
+  font-family: monospace;
+}
+.reg-name { color: var(--mut); }
+.reg-val { color: var(--cy); font-weight: bold; }
+.cpu-disasm {
+  margin-top: 6px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  padding: 6px;
+  border-radius: 4px;
+  color: #e2e8f0;
+}
+.cpu-disasm b { color: #f59e0b; }
+.cpu-proof-box {
+  margin-top: 8px;
+  padding: 6px;
+  border: 1px dashed #ef4444;
+  background: rgba(69, 10, 10, 0.4);
+  border-radius: 6px;
+  color: #fca5a5;
+  text-align: center;
+}

@@ -1,5 +1,5 @@
 /*! coi-serviceworker v0.1.6 - Guillem Cordoba 2021 - MIT License */
-let coepCredentialless = false;
+let coepCredentialless = true;
 if (typeof window === 'undefined') {
     self.addEventListener("install", () => self.skipWaiting());
     self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
@@ -47,7 +47,10 @@ if (typeof window === 'undefined') {
                     statusText: response.statusText,
                     headers: newHeaders,
                 });
-            }).catch((e) => console.error(e))
+            }).catch((e) => {
+                console.error(e);
+                return new Response(null, { status: 500, statusText: "Fetch error" });
+            })
         );
     });
 
