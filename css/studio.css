@@ -197,7 +197,9 @@ h1 {
   display: flex;
   flex-direction: column;
 }
-#screen-wrap:fullscreen, #screen-wrap:-webkit-full-screen {
+#screen-wrap:fullscreen,
+#screen-wrap.fs-active {
+
   width: 100vw;
   height: 100dvh;
   border: none;
@@ -225,7 +227,7 @@ h1 {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
 }
 #screen-wrap:fullscreen #fs-hud,
-#screen-wrap:-webkit-full-screen #fs-hud,
+
 #screen-wrap.fs-active #fs-hud {
   display: flex;
 }
@@ -269,7 +271,8 @@ h1 {
   touch-action: none;
 }
 #screen-wrap:fullscreen #screen_container > canvas,
-#screen-wrap:-webkit-full-screen #screen_container > canvas {
+#screen-wrap.fs-active #screen_container > canvas {
+
   max-height: 92dvh;
 }
 

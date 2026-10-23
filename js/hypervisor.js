@@ -11,6 +11,13 @@ export const PH_TXT = {
     "ph-guest": "Guest OS active (VGA / COM1 / PS2 Mouse / NIC)"
 };
 
+window.phase = function phase(id, st, extra) {
+    const e = document.getElementById(id);
+    if (!e) return;
+    e.className = "ph " + (st === "ok" ? "ok" : st === "err" ? "err" : st === "run" ? "run" : "");
+    const icon = st === "ok" ? "✔ " : st === "err" ? "✖ " : st === "run" ? "… " : "○ ";
+    e.textContent = icon + (PH_TXT[id] || id) + (extra ? " — " + extra : "");
+}
 export function phase(id, st, extra) {
     const e = document.getElementById(id);
     if (!e) return;
@@ -67,7 +74,7 @@ export class Hypervisor {
         } else {
             // Fallback to v86 for i686/x86 32-bit
             this.arch = "i686";
-            if (v86Fallback) v86Fallback(buffer, analysis);
+            if (v86Fallback) v86Fallback({ fda: { buffer: buffer } }, name, 128);
             return;
         }
 
