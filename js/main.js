@@ -8,16 +8,9 @@ window.startEmu = async function(cfg, name, ram) {
     const stat = document.getElementById("status");
     if(stat) stat.textContent = `Booting: ${name} (${ram} MB RAM)`;
 
-    // Stub implementation to bypass v86 missing for now and satisfy UI
-    ["ph-ready", "ph-bios", "ph-dev", "ph-guest"].forEach(id => {
-       const el = document.getElementById(id);
-       if (el) el.className = "ph ok";
-    });
     if(window.log) window.log("Hypervisor stub started.", "ok", "HV");
     return Promise.resolve();
 };
-
-
   window.onCpuStep = function(info, engine) {
       if (!$("cpu-debugger")) return;
       $("lbl-arch").textContent = window.multiArchHypervisor.arch || "None";
@@ -37,7 +30,7 @@ window.startEmu = async function(cfg, name, ram) {
   };
 
 
-import { Hypervisor } from './hypervisor.js';
+import { Hypervisor, phase, resetPhases, PH_TXT } from './hypervisor.js';
 import { analyzeImage } from './image-analyzer.js';
 import { createBlankFat16Disk, refreshSnapshotList, saveSnapshotToIDB, restoreSnapshotBuffer } from './storage-manager.js';
 import { bindPointerSurface, toggleDragLock, sendKey, sendText, mouseDelta, mouseBtn, clickOnce } from './input-controller.js';
@@ -497,6 +490,10 @@ window.builtin = function(b64s, name) {
 
 
   function init() {
+    window.multiArchHypervisor = new Hypervisor(document.querySelector("#screen_container canvas"));
+    window.phase = phase;
+    window.resetPhases = resetPhases;
+    window.PH_TXT = PH_TXT;
     if (window.__earlyConsole) {
       const box = $("log-con");
       const items = window.__earlyConsole.getBuffer();

@@ -3,6 +3,28 @@ import { RISCV64Engine } from './arch/riscv64-engine.js';
 import { ARM64Engine } from './arch/arm64-engine.js';
 import { analyzeImage } from './image-analyzer.js';
 
+export const PH_TXT = {
+    "ph-assets": "Hypervisor & BIOS ROMs loaded",
+    "ph-ready": "Emulator instance initialized",
+    "ph-bios": "SeaBIOS POST banner verified",
+    "ph-dev": "Boot device handed off (\"Booting from …\")",
+    "ph-guest": "Guest OS active (VGA / COM1 / PS2 Mouse / NIC)"
+};
+
+export function phase(id, st, extra) {
+    const e = document.getElementById(id);
+    if (!e) return;
+    e.className = "ph " + (st === "ok" ? "ok" : st === "err" ? "err" : st === "run" ? "run" : "");
+    const icon = st === "ok" ? "✔ " : st === "err" ? "✖ " : st === "run" ? "… " : "○ ";
+    e.textContent = icon + (PH_TXT[id] || id) + (extra ? " — " + extra : "");
+}
+
+export function resetPhases() {
+    ["ph-assets", "ph-ready", "ph-bios", "ph-dev", "ph-guest"].forEach(id => {
+        phase(id, "", "");
+    });
+}
+
 export class Hypervisor {
     constructor(vgaCanvas, termOut, termIn) {
         this.vgaCanvas = vgaCanvas;
