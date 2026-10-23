@@ -8,7 +8,7 @@ window.startEmu = async function(cfg, name, ram) {
     const stat = document.getElementById("status");
     if(stat) stat.textContent = `Booting: ${name} (${ram} MB RAM)`;
 
-    if(window.log) window.log("Hypervisor stub started.", "ok", "HV");
+
     return Promise.resolve();
 };
   window.onCpuStep = function(info, engine) {
@@ -35,6 +35,7 @@ import { analyzeImage } from './image-analyzer.js';
 import { createBlankFat16Disk, refreshSnapshotList, saveSnapshotToIDB, restoreSnapshotBuffer } from './storage-manager.js';
 import { bindPointerSurface, toggleDragLock, sendKey, sendText, mouseDelta, mouseBtn, clickOnce } from './input-controller.js';
 import { buildNetworkConfig, wireNetworkEvents, installFetchCorsFallback } from './network-manager.js';
+window.phase = phase;
 
 // Polyfill $
 function $(id) {
@@ -469,12 +470,12 @@ function $(id) {
     $("status").textContent = `Booting: ${S.label} (${ram} MB RAM)`;
     $("ph-ready").className = "ph run";
 
-    // Stub implementation to bypass v86 missing for now and satisfy UI
+
     $("ph-ready").className = "ph ok";
     $("ph-bios").className = "ph ok";
     $("ph-dev").className = "ph ok";
     $("ph-guest").className = "ph ok";
-    log("Hypervisor stub started.", "ok", "HV");
+
     return Promise.resolve();
   }
 
@@ -486,12 +487,184 @@ window.builtin = function(b64s, name) {
     const ram = parseInt(document.getElementById("ram").value, 10) || 64;
     return window.startEmu({ fda: { buffer: img.buffer } }, name, ram);
 }
+  async function fetchBuf(urls, label, onProg) {
+    let last;
+    for (const u of urls) {
+      try {
+        const r = await fetch(u);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const tot = parseInt(r.headers.get("content-length") || "0", 10);
+        let got = 0;
+        const rd = r.body.getReader(), chunks = [];
+        while (true) {
+          const { done, value } = await rd.read();
+          if (done) break;
+          chunks.push(value);
+          got += value.length;
+          if (onProg) onProg(got, tot);
+        }
+        const all = new Uint8Array(got);
+        let pos = 0;
+        for (const c of chunks) { all.set(c, pos); pos += c.length; }
+        return all.buffer;
+      } catch (err) { last = err; }
+    }
+    throw new Error(`${label}: All mirrors failed (${last && last.message})`);
+  }
 
+  function loadScript(url) {
+    return new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = url;
+      s.onload = res;
+      s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
 
+  async function ensureV86() {
+    if (window.V86) return;
+    overlay(true, "Loading Hypervisor Engine …", "libv86.js", 10);
+    let last;
+    for (const b of V86_BASES) {
+      try { await loadScript(b + "libv86.js"); window.S.base = b; return; }
+      catch (e) { last = e; }
+    }
+    throw new Error("Failed to load libv86.js from CDNs.");
+  }
 
+  function overlay(show, title, sub, pct) {
+    const ov = $("overlay");
+    if(!ov) return;
+    ov.className = show ? "show" : "";
+    if (title != null) $("ov-title").textContent = title;
+    if (sub != null) $("ov-sub").textContent = sub;
+    if (pct != null) $("ov-bar").style.width = pct + "%";
+  }
+
+  async function ensureAssets() {
+    if (window.S.assets) return;
+    overlay(true, "Loading Hypervisor Assets …", "libv86.js + SeaBIOS + VGABIOS", 5);
+    await ensureV86();
+    const bios = await fetchBuf(BIOS_BASES.map(b => b + "seabios.bin"), "SeaBIOS", (g, t) => overlay(true, null, "SeaBIOS", 20 + (t ? (g/t)*30 : 0)));
+    const vga = await fetchBuf(BIOS_BASES.map(b => b + "vgabios.bin"), "VGABIOS", (g, t) => overlay(true, null, "VGABIOS", 55 + (t ? (g/t)*30 : 0)));
+    window.S.assets = { bios, vga };
+    if(window.log) window.log(`BIOS ROMs verified (${bios.byteLength} + ${vga.byteLength} bytes).`, "ok", "LOAD");
+  }
+
+  function recreateScreen() {
+    const c = $("screen_container");
+    if(!c) return null;
+    c.innerHTML = "<div></div><canvas></canvas>";
+    c.classList.toggle("hide-cursor", window.S.hideCursor);
+    return c;
+  }
+
+  function destroyEmu() {
+    if (window.S.timer) { clearInterval(window.S.timer); window.S.timer = null; }
+    if (window.S.emu) { try { window.S.emu.destroy(); } catch (e) {} window.S.emu = null; }
+  }
+
+  function wire(emu) {
+    if(window.wireNetworkEvents) window.wireNetworkEvents(emu);
+    emu.add_listener("emulator-ready", () => {
+      if(window.log) window.log("Emulator hardware buses initialized.", "info", "EMU");
+      if(window.phase) window.phase("ph-ready", "ok");
+    });
+    emu.add_listener("emulator-started", () => {
+      if(window.phase) window.phase("ph-ready", "ok");
+      if(window.phase) window.phase("ph-bios", "run");
+    });
+    emu.add_listener("screen-set-size", (a) => {
+      const w = a[0], h = a[1], bpp = a[2];
+      window.S.g.video = bpp ? `GFX ${w}×${h}×${bpp}` : `TEXT ${w}×${h}`;
+      if (bpp) {
+        if (!window.S.g.bootFound) {
+          window.S.g.bootFound = true;
+          window.S.g.bootAt = performance.now();
+          if(window.phase) window.phase("ph-bios", "ok");
+          if(window.phase) window.phase("ph-dev", "ok", "VGA Framebuffer");
+        }
+        window.S.g.gfx++;
+        if(window.phase) window.phase("ph-guest", "ok", window.S.g.video);
+        if(window.log) window.log(`Guest switched to graphics framebuffer: ${w}×${h}×${bpp}`, "ok", "VGA");
+      }
+    });
+
+    emu.add_listener("screen-put-char", (a) => {
+      const r = a[0], c = a[1], ch = a[2];
+      const charStr = ch >= 32 && ch < 127 ? String.fromCharCode(ch) : " ";
+      const row = window.S.grid[r] || (window.S.grid[r] = []);
+      if (row[c] === charStr) return;
+      row[c] = charStr;
+      window.S.g.chars++;
+
+      const rowStr = row.join("").trim();
+
+      if (rowStr.includes("SeaBIOS (version") && window.S.g.gfx === 0) {
+        if(window.phase) window.phase("ph-bios", "ok");
+      }
+
+      const bootMatch = /Booting from (.+?)\.\.\./.exec(rowStr);
+      if (bootMatch && !window.S.g.bootFound) {
+        window.S.g.bootFound = true;
+        window.S.g.bootAt = performance.now();
+        if(window.phase) window.phase("ph-bios", "ok");
+        if(window.phase) window.phase("ph-dev", "ok", bootMatch[1]);
+        if(window.phase) window.phase("ph-guest", "run");
+      }
+
+      if (window.S.g.bootFound && window.S.g.chars > 100) if(window.phase) window.phase("ph-guest", "ok");
+    });
+  }
+
+  function tick() {
+    if (!window.S.emu) return;
+  }
+
+  async function realStartEmu(config, label, ramMB) {
+    destroyEmu();
+    window.S.label = label || "Custom OS";
+
+    try {
+      if(window.phase) window.phase("ph-assets", "run");
+      await ensureAssets();
+      if(window.phase) window.phase("ph-assets", "ok");
+
+      const container = recreateScreen();
+      const mb = ramMB || 128;
+
+      const opts = Object.assign({
+        wasm_path: window.S.base + "v86.wasm",
+        memory_size: mb * 1048576,
+        vga_memory_size: 16 * 1048576,
+        screen_container: container,
+        bios: { buffer: window.S.assets.bios.slice(0) },
+        vga_bios: { buffer: window.S.assets.vga.slice(0) },
+        autostart: true
+      }, config);
+
+      if(window.log) window.log(`Booting "${window.S.label}" with ${mb} MB Guest RAM + 16 MB VGA RAM …`, "info", "EMU");
+      overlay(false);
+      window.S.t0 = performance.now();
+      window.S.emu = new window.V86(opts);
+      wire(window.S.emu);
+      window.S.timer = setInterval(tick, 1000);
+    } catch (e) {
+      overlay(false);
+      if(window.phase) window.phase("ph-assets", "err");
+      if(window.showAlert) window.showAlert("BOOT_INIT_ERROR", String(e && e.message ? e.message : e));
+    }
+  }
+  window.realStartEmu = realStartEmu;
+
+  window.phase = phase;
+  window.resetPhases = resetPhases;
+  window.PH_TXT = PH_TXT;
   function init() {
-    window.multiArchHypervisor = new Hypervisor(document.querySelector("#screen_container canvas"));
     window.phase = phase;
+    window.multiArchHypervisor = new Hypervisor(document.querySelector("#screen_container canvas"));
+
     window.resetPhases = resetPhases;
     window.PH_TXT = PH_TXT;
     if (window.__earlyConsole) {
